@@ -40,36 +40,36 @@ The application strictly separates **Presentation (React UI)**, **Rendering (`pd
 
 ```mermaid
 flowchart TB
-    subgraph UI_Layer [Main Thread / Presentation Layer]
-        A[User File Input / Dropzone] --> B[File API: File / Blob]
-        B --> C[Document Store / React State]
-        C --> D[Virtual Thumbnail Grid]
-        C --> E[Toolbar Actions: Merge, Split, Edit, Rotate]
-        D --> F[Visual Reordering / Drag & Drop]
+    subgraph UI_Layer ["Main Thread / Presentation Layer"]
+        A["User File Input / Dropzone"] --> B["File API: File / Blob"]
+        B --> C["Document Store / React State"]
+        C --> D["Virtual Thumbnail Grid"]
+        C --> E["Toolbar Actions: Merge, Split, Edit, Rotate"]
+        D --> F["Visual Reordering / Drag & Drop"]
     end
 
-    subgraph Worker_Boundary [Worker Boundary - postMessage with Transferables]
-        G[Worker Dispatcher]
+    subgraph Worker_Boundary ["Worker Boundary - postMessage with Transferables"]
+        G["Worker Dispatcher"]
     end
 
-    subgraph Background_Workers [Web Worker Thread / Concurrency Layer]
-        H[Render Worker: pdf.js]
-        I[Mutation Worker: pdf-lib]
+    subgraph Background_Workers ["Web Worker Thread / Concurrency Layer"]
+        H["Render Worker (pdf.js)"]
+        I["Mutation Worker (pdf-lib)"]
         
-        H --> J[OffscreenCanvas / ImageData Rasterization]
-        I --> K[Byte Stream Mutation Engine]
+        H --> J["OffscreenCanvas / ImageData Rasterization"]
+        I --> K["Byte Stream Mutation Engine"]
     end
 
-    subgraph Output_Pipeline [Client Export Pipeline]
-        L[Uint8Array Output Buffer]
-        M[Blob: application/pdf or image/png]
-        N[Trigger Browser Download via Object URL]
+    subgraph Output_Pipeline ["Client Export Pipeline"]
+        L["Uint8Array Output Buffer"]
+        M["Blob: application/pdf or image/png"]
+        N["Trigger Browser Download via Object URL"]
     end
 
     C --> G
-    G -->|Extract Pages / Render Thumbnails| H
-    G -->|Merge / Rotate / Stamp / Save| I
-    J -->|Rendered Bitmaps| D
+    G -->|"Extract Pages / Render Thumbnails"| H
+    G -->|"Merge / Rotate / Stamp / Save"| I
+    J -->|"Rendered Bitmaps"| D
     K --> L
     L --> M --> N
 ```
@@ -131,24 +131,24 @@ sequenceDiagram
 
     User->>Main: Uploads 50-page PDF (25MB)
     Main->>Main: Read File as ArrayBuffer
-    Main->>Worker: postMessage({ type: 'LOAD_DOC', buffer }, [buffer]) (Transferable)
-    Note over Main: Zero memory copy; buffer ownership transferred to Worker
+    Main->>Worker: Transfer ArrayBuffer [Transferable]
+    Note over Main: Zero memory copy - buffer ownership transferred to Worker
     Worker->>Engine: Parse PDF Structure
     Engine-->>Worker: Structure Ready
-    Worker-->>Main: postMessage({ type: 'DOC_LOADED', pageCount: 50 })
+    Worker-->>Main: Document Loaded (pageCount: 50)
     
     loop On-Demand Virtual Scroll
-        Main->>Worker: postMessage({ type: 'RENDER_PAGE', pageIndex: i, scale: 0.5 })
+        Main->>Worker: Request Thumbnail (pageIndex: i)
         Worker->>Engine: Render to OffscreenCanvas
         Worker-->>Main: Transfer ImageBitmap or PNG Data
         Main->>Main: Display Thumbnail
     end
 
     User->>Main: Click "Merge & Save"
-    Main->>Worker: postMessage({ type: 'EXECUTE_MUTATION', plan: [...] })
+    Main->>Worker: Execute Mutation Plan
     Worker->>Engine: Run pdf-lib pipeline
     Engine-->>Worker: Serialized Uint8Array
-    Worker-->>Main: postMessage({ type: 'MUTATION_COMPLETE', resultBuffer }, [resultBuffer])
+    Worker-->>Main: Mutation Complete (resultBuffer)
     Main->>User: Trigger Download Blob
 ```
 
@@ -364,10 +364,10 @@ export type WorkerResponse =
 
 ```mermaid
 flowchart TD
-    subgraph Testing_Layers [Testing & Validation Strategy]
-        Unit[Unit Tests - Vitest] -->|Test pure functions| ByteValidation[Verify Output PDF Page Count & Rotation]
-        Memory[Memory Profiling] -->|Headless Chrome| LeakCheck[Ensure Zero Memory Retention post-revokeObjectURL]
-        BrowserTest[E2E Tests - Playwright] -->|Simulate User Flow| DragDrop[Verify Drag-and-Drop Order vs Downloaded Output]
+    subgraph Testing_Layers ["Testing & Validation Strategy"]
+        Unit["Unit Tests (Vitest)"] -->|"Test pure functions"| ByteValidation["Verify Output PDF Page Count & Rotation"]
+        Memory["Memory Profiling"] -->|"Headless Chrome"| LeakCheck["Ensure Zero Memory Retention post-revokeObjectURL"]
+        BrowserTest["E2E Tests (Playwright)"] -->|"Simulate User Flow"| DragDrop["Verify Drag-and-Drop Order vs Downloaded Output"]
     end
 ```
 
